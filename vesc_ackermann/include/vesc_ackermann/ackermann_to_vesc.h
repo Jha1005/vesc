@@ -28,36 +28,40 @@
 #ifndef VESC_ACKERMANN_ACKERMANN_TO_VESC_H_
 #define VESC_ACKERMANN_ACKERMANN_TO_VESC_H_
 
-#include <ros/ros.h>
-#include <ackermann_msgs/AckermannDriveStamped.h>
+#include <rclcpp/rclcpp.hpp>
+#include <ackermann_msgs/msg/ackermann_drive_stamped.hpp>
 
 namespace vesc_ackermann
 {
 
-class AckermannToVesc
+class AckermannToVesc : public rclcpp::Node
 {
 public:
-  AckermannToVesc(ros::NodeHandle nh, ros::NodeHandle private_nh);
+  explicit AckermannToVesc();
 
 private:
   // ROS parameters
   // conversion gain and offset
-  bool previous_mode_speed_ = true;
+  bool previous_mode_speed_;
   double speed_to_erpm_gain_, speed_to_erpm_offset_;
   double accel_to_current_gain_, accel_to_brake_gain_;
   double steering_to_servo_gain_, steering_to_servo_offset_;
-
   /** @todo consider also providing an interpolated look-up table conversion */
 
-  // ROS services
-  ros::Publisher erpm_pub_;
-  ros::Publisher servo_pub_;
-  ros::Publisher current_pub_;
-  ros::Publisher brake_pub_;
-  ros::Subscriber ackermann_sub_;
+  // ROS publishers
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr erpm_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr servo_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr current_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr brake_pub_;
+  
+  // ROS subscription
+  rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr ackermann_sub_;
 
   // ROS callbacks
-  void ackermannCmdCallback(const ackermann_msgs::AckermannDriveStamped::ConstPtr& cmd);
+  void ackermannCmdCallback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr cmd);
+
+  // Parameter handling
+  void declareAndGetParameters();
 };
 
 }  // namespace vesc_ackermann
