@@ -1,19 +1,27 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
+  <!-- Package name and version -->
   <name>vesc_driver</name>
   <version>1.1.0</version>
+
+  <!-- Description and contact information -->
   <description>
     ROS device driver for the Vedder VESC open source motor driver.
   </description>
   <maintainer email="joebetz@seas.upenn.edu">Johannes Betz</maintainer>
   <license>BSD</license>
+
+  <!-- URLs for project information -->
   <url type="website">http://www.ros.org/wiki/vesc_driver</url>
   <url type="repository">https://github.com/f1tenth/vesc</url>
   <url type="bugtracker">https://github.com/f1tenth/vesc/issues</url>
+
+  <!-- Authors of the package -->
   <author email="boulet@ll.mit.edu">Michael T. Boulet</author>
   <author email="josh.whitley@autoware.org">Joshua Whitley</author>
 
+  <!-- Dependencies for building and running the package -->
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>roslint</build_depend>
 
@@ -24,6 +32,7 @@
   <depend>std_msgs</depend>
   <depend>vesc_msgs</depend>
 
+  <!-- Export the nodelet plugin configuration -->
   <export>
     <nodelet plugin="${prefix}/vesc_driver_nodelet.xml"/>
   </export>
