@@ -1,14 +1,37 @@
-<!-- -*- mode: XML -*- -->
-<launch>
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
-  <!-- Optionally launch in GDB, for debugging -->
-  <arg name="debug" default="false" />
-  <arg if="$(arg debug)" name="launch_prefix" value="xterm -e gdb --args" />
-  <arg unless="$(arg debug)" name="launch_prefix" value="" />
+def generate_launch_description():
+    # Declare the 'debug' argument
+    debug_arg = DeclareLaunchArgument(
+        'debug',
+        default_value='false',
+        description='Launch node in GDB debugging mode'
+    )
 
-  <!-- VESC to Odom node -->
-  <node pkg="vesc_ackermann" type="vesc_to_odom_node" name="vesc_to_odom_node"
-        output="screen" launch-prefix="$(arg launch_prefix)" >
-  </node>
+    # Conditional launch prefix based on debug mode
+    launch_prefix_arg = DeclareLaunchArgument(
+        'launch_prefix',
+        default_value='',
+        description='Launch prefix for debugging',
+        condition=IfCondition(LaunchConfiguration('debug'))
+    )
 
-</launch>
+    # VESC to Odom Node
+    vesc_to_odom_node = Node(
+        package='vesc_ackermann',
+        executable='vesc_to_odom_node',
+        name='vesc_to_odom_node',
+        output='screen',
+        prefix=LaunchConfiguration('launch_prefix')
+    )
+
+    # Launch description
+    return LaunchDescription([
+        debug_arg,
+        launch_prefix_arg,
+        vesc_to_odom_node
+    ])
