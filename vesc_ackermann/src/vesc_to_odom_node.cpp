@@ -23,19 +23,22 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
 // WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <ros/ros.h>
-
+#include <rclcpp/rclcpp.hpp>
 #include "vesc_ackermann/vesc_to_odom.h"
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "vesc_to_odom_node");
-  ros::NodeHandle nh;
-  ros::NodeHandle private_nh("~");
+  // Initialize ROS 2
+  rclcpp::init(argc, argv);
 
-  vesc_ackermann::VescToOdom vesc_to_odom(nh, private_nh);
+  // Create the VescToOdom node
+  auto vesc_to_odom = std::make_shared<vesc_ackermann::VescToOdom>();
 
-  ros::spin();
+  // Spin the node
+  rclcpp::spin(vesc_to_odom);
+
+  // Shutdown ROS 2
+  rclcpp::shutdown();
 
   return 0;
 }
