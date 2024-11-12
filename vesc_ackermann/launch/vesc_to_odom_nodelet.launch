@@ -1,29 +1,62 @@
-<!-- -*- mode: XML -*- -->
-<launch>
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
-  <arg name="start_manager" default="true" />
-  <arg name="manager" default="vesc_nodelet_manager" />
+def generate_launch_description():
+    # Declare launch arguments
+    start_manager_arg = DeclareLaunchArgument(
+        'start_manager', default_value='true', description='Start nodelet manager'
+    )
+    manager_arg = DeclareLaunchArgument(
+        'manager', default_value='vesc_nodelet_manager', description='Nodelet manager name'
+    )
+    debug_arg = DeclareLaunchArgument(
+        'debug', default_value='false', description='Launch in debug mode'
+    )
+    launch_prefix_arg = DeclareLaunchArgument(
+        'launch_prefix', default_value='',
+        description='Launch prefix (used for debugging)', condition=IfCondition(LaunchConfiguration('debug'))
+    )
+    num_worker_threads_arg = DeclareLaunchArgument(
+        'num_worker_threads', default_value='4', description='Number of worker threads for the manager'
+    )
 
-  <!-- Optionally launch manager in GDB, for debugging -->
-  <arg name="debug" default="false" />
-  <arg if="$(arg debug)" name="launch_prefix" value="xterm -e gdb --args" />
-  <arg unless="$(arg debug)" name="launch_prefix" value="" />
-  <!-- Worker threads -->
-  <arg name="num_worker_threads" default="4" />
+    # Disable bond heartbeat timeout in debug mode
+    bond_disable_heartbeat = LogInfo(
+        condition=IfCondition(LaunchConfiguration('debug')),
+        msg="/bond_disable_heartbeat_timeout set to true"
+    )
 
-  <!-- Also globally disable bond heartbeat timeout in debug mode, so everything
-       doesn't die when you hit a break point -->
-  <param if="$(arg debug)" name="/bond_disable_heartbeat_timeout" value="true" />
+    # Nodelet manager
+    nodelet_manager = Node(
+        package='nodelet',
+        executable='nodelet',
+        name=LaunchConfiguration('manager'),
+        output='screen',
+        parameters=[{'num_worker_threads': LaunchConfiguration('num_worker_threads')}],
+        arguments=['manager'],
+        condition=IfCondition(LaunchConfiguration('start_manager')),
+        prefix=LaunchConfiguration('launch_prefix')
+    )
 
-  <!-- Nodelet manager -->
-  <node if="$(arg start_manager)" pkg="nodelet" type="nodelet" name="$(arg manager)"
-        args="manager" output="screen" launch-prefix="$(arg launch_prefix)">
-     <param name="num_worker_threads" value="$(arg num_worker_threads)" />
-  </node>
+    # VESC to Odom Nodelet
+    vesc_to_odom_nodelet = Node(
+        package='nodelet',
+        executable='nodelet',
+        name='vesc_to_odom_nodelet',
+        output='screen',
+        arguments=['load', 'vesc_ackermann::VescToOdomNodelet', LaunchConfiguration('manager')]
+    )
 
-  <!-- VESC to Odom nodelet -->
-  <node pkg="nodelet" type="nodelet" name="vesc_to_odom_nodelet"
-        args="load vesc_ackermann::VescToOdomNodelet $(arg manager)" >
-  </node>    
-
-</launch>
+    return LaunchDescription([
+        start_manager_arg,
+        manager_arg,
+        debug_arg,
+        launch_prefix_arg,
+        num_worker_threads_arg,
+        bond_disable_heartbeat,
+        nodelet_manager,
+        vesc_to_odom_nodelet
+    ])
