@@ -23,9 +23,8 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
 // WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <nodelet/nodelet.h>
-#include <pluginlib/class_list_macros.h>
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_components/register_node_macro.hpp>
 
 #include <memory>
 
@@ -34,23 +33,23 @@
 namespace vesc_ackermann
 {
 
-class VescToOdomNodelet: public nodelet::Nodelet
+class VescToOdomComponent : public rclcpp::Node
 {
 public:
-  VescToOdomNodelet() {}
+  explicit VescToOdomComponent(const rclcpp::NodeOptions & options)
+  : Node("vesc_to_odom_node", options)
+  {
+    RCLCPP_DEBUG(this->get_logger(), "Initializing RACECAR VESC odometry estimator component");
+
+    // Initialize VescToOdom with the current node as a shared pointer
+    vesc_to_odom_ = std::make_shared<VescToOdom>(shared_from_this());
+  }
 
 private:
-  virtual void onInit(void);
-
   std::shared_ptr<VescToOdom> vesc_to_odom_;
-};  // class VescToOdomNodelet
-
-void VescToOdomNodelet::onInit()
-{
-  NODELET_DEBUG("Initializing RACECAR VESC odometry estimator nodelet");
-  vesc_to_odom_.reset(new VescToOdom(getNodeHandle(), getPrivateNodeHandle()));
-}
+};  // class VescToOdomComponent
 
 }  // namespace vesc_ackermann
 
-PLUGINLIB_EXPORT_CLASS(vesc_ackermann::VescToOdomNodelet, nodelet::Nodelet);
+RCLCPP_COMPONENTS_REGISTER_NODE(vesc_ackermann::VescToOdomComponent)
+
