@@ -28,7 +28,8 @@ catkin_package(
     nodelet
     pluginlib
     std_msgs
-    vesc_msgs serial
+    vesc_msgs
+    serial
 )
 
 ###########
