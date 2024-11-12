@@ -23,34 +23,27 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
 // WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <nodelet/nodelet.h>
-#include <pluginlib/class_list_macros.h>
-#include <ros/ros.h>
-
 #include <memory>
-
+#include <rclcpp/rclcpp.hpp>
+#include <pluginlib/class_loader.hpp>
 #include "vesc_ackermann/ackermann_to_vesc.h"
 
 namespace vesc_ackermann
 {
 
-class AckermannToVescNodelet: public nodelet::Nodelet
+class AckermannToVescNodelet : public rclcpp::Node
 {
 public:
-  AckermannToVescNodelet() {}
+  AckermannToVescNodelet() : Node("ackermann_to_vesc_nodelet")
+  {
+    ackermann_to_vesc_ = std::make_shared<AckermannToVesc>();
+  }
 
 private:
-  virtual void onInit(void);
-
   std::shared_ptr<AckermannToVesc> ackermann_to_vesc_;
-};  // class AckermannToVescNodelet
-
-void AckermannToVescNodelet::onInit()
-{
-  NODELET_DEBUG("Initializing ackermann to VESC nodelet");
-  ackermann_to_vesc_.reset(new AckermannToVesc(getNodeHandle(), getPrivateNodeHandle()));
-}
+};
 
 }  // namespace vesc_ackermann
 
-PLUGINLIB_EXPORT_CLASS(vesc_ackermann::AckermannToVescNodelet, nodelet::Nodelet);
+#include <pluginlib/class_list_macros.hpp>
+PLUGINLIB_COMPONENT_REGISTER_CLASS(vesc_ackermann::AckermannToVescNodelet, vesc_ackermann::AckermannToVescNodelet, rclcpp::Node)
