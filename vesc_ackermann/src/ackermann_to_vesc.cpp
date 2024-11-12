@@ -26,56 +26,57 @@
 // -*- mode:c++; fill-column: 100; -*-
 
 #include "vesc_ackermann/ackermann_to_vesc.h"
-
 #include <cmath>
 #include <sstream>
 #include <string>
 
-#include <std_msgs/Float64.h>
-
 namespace vesc_ackermann
 {
 
-template <typename T>
-inline bool getRequiredParam(const ros::NodeHandle& nh, const std::string& name, T* value);
-
-AckermannToVesc::AckermannToVesc(ros::NodeHandle nh, ros::NodeHandle private_nh)
+AckermannToVesc::AckermannToVesc() : Node("ackermann_to_vesc")
 {
-  // get conversion parameters
-  if (!getRequiredParam(nh, "speed_to_erpm_gain", &speed_to_erpm_gain_))
-    return;
-  if (!getRequiredParam(nh, "speed_to_erpm_offset", &speed_to_erpm_offset_))
-    return;
-  if (!getRequiredParam(nh, "accel_to_current_gain", &accel_to_current_gain_))
-    return;
-  if (!getRequiredParam(nh, "accel_to_brake_gain", &accel_to_brake_gain_))
-    return;
-  if (!getRequiredParam(nh, "steering_angle_to_servo_gain", &steering_to_servo_gain_))
-    return;
-  if (!getRequiredParam(nh, "steering_angle_to_servo_offset", &steering_to_servo_offset_))
-    return;
+  declareAndGetParameters();
 
-  // create publishers to vesc electric-RPM (speed) and servo commands
-  erpm_pub_ = nh.advertise<std_msgs::Float64>("commands/motor/speed", 10);
-  current_pub_ = nh.advertise<std_msgs::Float64>("commands/motor/current", 10);
-  brake_pub_ = nh.advertise<std_msgs::Float64>("commands/motor/brake", 10);
-  servo_pub_ = nh.advertise<std_msgs::Float64>("commands/servo/position", 10);
+  // Create publishers to VESC electric-RPM (speed), current, brake, and servo commands
+  erpm_pub_ = this->create_publisher<std_msgs::msg::Float64>("commands/motor/speed", 10);
+  current_pub_ = this->create_publisher<std_msgs::msg::Float64>("commands/motor/current", 10);
+  brake_pub_ = this->create_publisher<std_msgs::msg::Float64>("commands/motor/brake", 10);
+  servo_pub_ = this->create_publisher<std_msgs::msg::Float64>("commands/servo/position", 10);
 
-  // subscribe to ackermann topic
-  ackermann_sub_ = nh.subscribe("ackermann_cmd", 10, &AckermannToVesc::ackermannCmdCallback, this);
+  // Subscribe to ackermann_cmd topic
+  ackermann_sub_ = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>(
+    "ackermann_cmd", 10, std::bind(&AckermannToVesc::ackermannCmdCallback, this, std::placeholders::_1));
 }
 
-typedef ackermann_msgs::AckermannDriveStamped::ConstPtr AckermannMsgPtr;
-void AckermannToVesc::ackermannCmdCallback(const AckermannMsgPtr& cmd)
+void AckermannToVesc::declareAndGetParameters()
 {
-  // calc vesc electric RPM (speed)
-  std_msgs::Float64::Ptr erpm_msg(new std_msgs::Float64);
+  // Declare parameters
+  this->declare_parameter("speed_to_erpm_gain", 4.5);
+  this->declare_parameter("speed_to_erpm_offset", 0.0);
+  this->declare_parameter("accel_to_current_gain", 12.0);
+  this->declare_parameter("accel_to_brake_gain", 12.0);
+  this->declare_parameter("steering_angle_to_servo_gain", 0.5);
+  this->declare_parameter("steering_angle_to_servo_offset", 0.5);
+
+  // Get parameter values
+  this->get_parameter("speed_to_erpm_gain", speed_to_erpm_gain_);
+  this->get_parameter("speed_to_erpm_offset", speed_to_erpm_offset_);
+  this->get_parameter("accel_to_current_gain", accel_to_current_gain_);
+  this->get_parameter("accel_to_brake_gain", accel_to_brake_gain_);
+  this->get_parameter("steering_angle_to_servo_gain", steering_to_servo_gain_);
+  this->get_parameter("steering_angle_to_servo_offset", steering_to_servo_offset_);
+}
+
+void AckermannToVesc::ackermannCmdCallback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr cmd)
+{
+  // Calculate VESC electric RPM (speed)
+  auto erpm_msg = std::make_shared<std_msgs::msg::Float64>();
   erpm_msg->data = speed_to_erpm_gain_ * cmd->drive.speed + speed_to_erpm_offset_;
 
-  // calc vesc current/brake (acceleration)
+  // Calculate VESC current/brake (acceleration)
   bool is_positive_accel = true;
-  std_msgs::Float64::Ptr current_msg(new std_msgs::Float64);
-  std_msgs::Float64::Ptr brake_msg(new std_msgs::Float64);
+  auto current_msg = std::make_shared<std_msgs::msg::Float64>();
+  auto brake_msg = std::make_shared<std_msgs::msg::Float64>();
   current_msg->data = 0;
   brake_msg->data = 0;
   if (cmd->drive.acceleration < 0)
@@ -88,33 +89,29 @@ void AckermannToVesc::ackermannCmdCallback(const AckermannMsgPtr& cmd)
     current_msg->data = accel_to_current_gain_ * cmd->drive.acceleration;
   }
 
-  // calc steering angle (servo)
-  std_msgs::Float64::Ptr servo_msg(new std_msgs::Float64);
+  // Calculate steering angle (servo)
+  auto servo_msg = std::make_shared<std_msgs::msg::Float64>();
   servo_msg->data = steering_to_servo_gain_ * cmd->drive.steering_angle + steering_to_servo_offset_;
 
-  // publish
-  if (ros::ok())
+  // Publish the commands
+  if (erpm_msg->data != 0 || previous_mode_speed_)
   {
-    // The below code attempts to stick to the previous mode until a new message forces a mode switch.
-    if (erpm_msg->data != 0 || previous_mode_speed_)
+    erpm_pub_->publish(*erpm_msg);
+  }
+  else
+  {
+    if (is_positive_accel)
     {
-      erpm_pub_.publish(erpm_msg);
+      current_pub_->publish(*current_msg);
     }
     else
     {
-      if (is_positive_accel)
-      {
-        current_pub_.publish(current_msg);
-      }
-      else
-      {
-        brake_pub_.publish(brake_msg);
-      }
+      brake_pub_->publish(*brake_msg);
     }
-    servo_pub_.publish(servo_msg);
   }
+  servo_pub_->publish(*servo_msg);
 
-  // The lines below are to determine which mode we are in so we can hold until new messages force a switch.
+  // Determine the current mode to maintain until a new message forces a switch
   if (erpm_msg->data != 0)
   {
     previous_mode_speed_ = true;
@@ -123,16 +120,6 @@ void AckermannToVesc::ackermannCmdCallback(const AckermannMsgPtr& cmd)
   {
     previous_mode_speed_ = false;
   }
-}
-
-template <typename T>
-inline bool getRequiredParam(const ros::NodeHandle& nh, const std::string& name, T* value)
-{
-  if (nh.getParam(name, *value))
-    return true;
-
-  ROS_FATAL("AckermannToVesc: Parameter %s is required.", name.c_str());
-  return false;
 }
 
 }  // namespace vesc_ackermann
