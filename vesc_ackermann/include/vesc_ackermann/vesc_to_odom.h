@@ -30,19 +30,19 @@
 
 #include <memory>
 #include <string>
-
-#include <ros/ros.h>
-#include <vesc_msgs/VescStateStamped.h>
-#include <std_msgs/Float64.h>
-#include <tf/transform_broadcaster.h>
+#include <rclcpp/rclcpp.hpp>
+#include <vesc_msgs/msg/vesc_state_stamped.hpp>
+#include <std_msgs/msg/float64.hpp>
+#include <tf2_ros/transform_broadcaster.h>
+#include <nav_msgs/msg/odometry.hpp>
 
 namespace vesc_ackermann
 {
 
-class VescToOdom
+class VescToOdom : public rclcpp::Node
 {
 public:
-  VescToOdom(ros::NodeHandle nh, ros::NodeHandle private_nh);
+  explicit VescToOdom();
 
 private:
   // ROS parameters
@@ -50,6 +50,7 @@ private:
   std::string base_frame_;
   /** State message does not report servo position, so use the command instead */
   bool use_servo_cmd_;
+  
   // conversion gain and offset
   double speed_to_erpm_gain_, speed_to_erpm_offset_;
   double steering_to_servo_gain_, steering_to_servo_offset_;
@@ -58,18 +59,25 @@ private:
 
   // odometry state
   double x_, y_, yaw_;
-  std_msgs::Float64::ConstPtr last_servo_cmd_;  ///< Last servo position commanded value
-  vesc_msgs::VescStateStamped::ConstPtr last_state_;  ///< Last received state message
+  std::shared_ptr<std_msgs::msg::Float64> last_servo_cmd_;  ///< Last servo position commanded value
+  std::shared_ptr<vesc_msgs::msg::VescStateStamped> last_state_;  ///< Last received state message
 
-  // ROS services
-  ros::Publisher odom_pub_;
-  ros::Subscriber vesc_state_sub_;
-  ros::Subscriber servo_sub_;
-  std::shared_ptr<tf::TransformBroadcaster> tf_pub_;
+  // ROS publishers
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+  
+  // ROS subscriptions
+  rclcpp::Subscription<vesc_msgs::msg::VescStateStamped>::SharedPtr vesc_state_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr servo_sub_;
+  
+  // TF broadcaster
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   // ROS callbacks
-  void vescStateCallback(const vesc_msgs::VescStateStamped::ConstPtr& state);
-  void servoCmdCallback(const std_msgs::Float64::ConstPtr& servo);
+  void vescStateCallback(const vesc_msgs::msg::VescStateStamped::SharedPtr state);
+  void servoCmdCallback(const std_msgs::msg::Float64::SharedPtr servo);
+
+  // Parameter handling
+  void declareAndGetParameters();
 };
 
 }  // namespace vesc_ackermann
